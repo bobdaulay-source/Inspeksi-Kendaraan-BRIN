@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Form Inspeksi Kendaraan (Offline PDF)</title>
+  <style>
+    :root{--bg:#f4f4f5;--card:#fff;--muted:#6b7280;--text:#111827;--accent:#0ea5e9;--ok:#16a34a;--warn:#dc2626}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--text)}
+    .container{max-width:1100px;margin:24px auto;padding:16px}
+    .card{background:var(--card);border:1px solid #d1d5db;border-radius:16px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
+    header{padding:20px 24px;border-bottom:1px solid #e5e7eb;display:flex;gap:12px;align-items:center;justify-content:space-between}
+    header h1{font-size:18px;margin:0}
+    header small{color:var(--muted)}
+    .grid{display:grid;gap:12px}
+    .g-2{grid-template-columns:repeat(2,1fr)}
+    .g-3{grid-template-columns:repeat(3,1fr)}
+    .section{padding:16px 24px;border-bottom:1px solid #e5e7eb}
+    .section h2{margin:0 0 12px;font-size:16px}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #d1d5db;background:#fff;color:var(--text)}
+    textarea{min-height:90px;resize:vertical}
+    .row{display:flex;align-items:center;gap:10px}
+    .btns{display:flex;flex-wrap:wrap;gap:10px}
+    button{padding:10px 14px;border:1px solid #d1d5db;border-radius:10px;background:#f9fafb;color:var(--text);cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#22c55e,#16a34a);border-color:#15803d;color:#fff}
+    button.warn{background:linear-gradient(180deg,#ef4444,#b91c1c);border-color:#7f1d1d;color:#fff}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    th,td{padding:8px 10px;font-size:13px}
+    thead th{color:var(--accent);text-align:left}
+    tr.item{background:#f9fafb;border:1px solid #e5e7eb}
+    tr.item td{border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}
+    tr.item td:first-child{border-left:1px solid #e5e7eb;border-top-left-radius:10px;border-bottom-left-radius:10px}
+    tr.item td:last-child{border-right:1px solid #e5e7eb;border-top-right-radius:10px;border-bottom-right-radius:10px}
+    .pill{display:inline-flex;gap:8px}
+    .footer{padding:16px 24px;border-top:1px solid #e5e7eb}
+    .muted{color:var(--muted)}
+    .note{font-size:12px;color:#6b7280}
+    @media(max-width:800px){.g-2,.g-3{grid-template-columns:1fr}}
+    /* Print styles for clean A4 PDF */
+    @page{size:A4;margin:16mm}
+    @media print{
+      body{background:#fff;color:#000}
+      .container{margin:0;max-width:none}
+      .card{box-shadow:none;border:0}
+      header,.btns.top{display:none}
+      input,select,textarea{border:1px solid #bbb;background:#fff;color:#000}
+      .section{page-break-inside:avoid}
+      .footer .muted{display:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" id="app">
+      <header>
+        <div>
+          <h1>Formulir Inspeksi Kendaraan</h1>
+          <small>Biro Komunikasi, Publikasi Umum, dan Kesekretariatan</small>
+        </div>
+        <div class="btns top">
+          <button onclick="loadLocal()">Muat</button>
+          <button onclick="exportJSON()">Ekspor JSON</button>
+          <button onclick="exportCSV()">Ekspor CSV</button>
+          <button onclick="printPDF()">Ekspor PDF (Offline)</button>
+          <button onclick="window.print()">Cetak</button>
+          <button class="warn" onclick="resetForm()">Reset</button>
+        </div>
+      </header>
+
+      <div class="section">
+        <h2>Identitas Kendaraan</h2>
+        <div class="grid g-3">
+          <div><label>Nama Pengemudi</label><input id="driver" placeholder="Junaedi" /></div>
+          <div><label>Nomor Polisi</label><input id="plate" placeholder="B 7057 SPA" /></div>
+          <div><label>Tanggal Inspeksi</label><input id="date" type="date" /></div>
+          <div><label>KM Awal</label><input id="km_start" type="number" min="0" /></div>
+          <div><label>KM Akhir</label><input id="km_end" type="number" min="0" /></div>
+          <div><label>Jenis Kendaraan</label><input id="type" placeholder="MPV / Sedan / Minibus" /></div>
+          <div><label>Tahun Kendaraan</label><input id="year" type="number" min="1990" max="2100" /></div>
+          <div><label>Start Inspeksi (jam)</label><input id="start_time" type="time" /></div>
+          <div><label>Finish (jam)</label><input id="end_time" type="time" /></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Checklist</h2>
+        <div class="note">Pilih G untuk Good, B untuk Bad, N/A bila tidak ada.</div>
+        <table>
+          <thead><tr><th style="width:44%">Item</th><th style="width:18%">G</th><th style="width:18%">B</th><th style="width:18%">N/A</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="row" style="margin-top:8px; gap:16px">
+          <span id="cnt_g">Good: 0</span>
+          <span id="cnt_b">Bad: 0</span>
+          <span id="cnt_na">N/A: 0</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Catatan</h2>
+        <textarea id="notes" placeholder="Tulis temuan, saran perbaikan, atau catatan lain"></textarea>
+      </div>
+
+      <div class="footer">
+        <div class="grid g-2" style="width:100%">
+          <div><label>Nama Pengemudi</label><input id="sign_driver" placeholder="Nama jelas pengemudi" /></div>
+          <div><label>Nama Pemeriksa</label><input id="sign_inspector" placeholder="Nama jelas pemeriksa" /></div>
+        </div>
+        <div class="btns bottom" style="margin-top:12px">
+          <button class="primary" onclick="saveLocal()">Simpan Lokal</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Versi offline. Gunakan Ekspor PDF (Offline) atau tombol Cetak untuk simpan ke PDF.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+// Build checklist rows
+const LABELS=['SIM','STNK','Kartu RFID','P3K','Plat Nomor Depan','Plat Nomor Belakang','Lampu Besar Dekat – Kanan','Lampu Besar Dekat – Kiri','Lampu Besar Jauh – Kanan','Lampu Besar Jauh – Kiri','Lampu Sen Depan – Kanan','Lampu Sen Depan – Kiri','Lampu Sen Belakang – Kanan','Lampu Sen Belakang – Kiri','Lampu Rem – Kanan','Lampu Rem – Kiri','Lampu Mundur – Kanan','Lampu Mundur – Kiri','Lampu Hazard – Kiri','Lampu Hazard – Kanan','Klakson','Kondisi Ban – Depan Kanan','Kondisi Ban – Depan Kiri','Kondisi Ban – Belakang Kanan','Kondisi Ban – Belakang Kiri','Kondisi Ban – Serep','Kunci Roda','Dongkrak','Kaca Spion – Kanan','Kaca Spion – Kiri','Kaca Spion – Dalam','Wiper – Kanan','Wiper – Kiri','Air Wiper','Kondisi Body','Minyak Rem','Kondisi Rem','Oli Mesin','Air Radiator','Air Accu','Kondisi AC'];
+const ITEMS=LABELS.map(l=>({label:l,id:l.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}));
+const tbody=document.getElementById('tbody');
+function mkRow(it){const tr=document.createElement('tr');tr.className='item';const td1=document.createElement('td');td1.textContent=it.label;
+function radio(v){const lab=document.createElement('label');lab.style.display='inline-flex';lab.style.alignItems='center';lab.style.gap='6px';const i=document.createElement('input');i.type='radio';i.name=it.id;i.value=v;i.addEventListener('change',updateCounters);lab.appendChild(i);lab.appendChild(document.createTextNode(v));return lab}
+const td2=document.createElement('td');td2.appendChild(radio('G'));
+const td3=document.createElement('td');td3.appendChild(radio('B'));
+const td4=document.createElement('td');td4.appendChild(radio('NA'));
+tr.append(td1,td2,td3,td4);return tr}
+ITEMS.forEach(it=>tbody.appendChild(mkRow(it)));
+function q(s){return document.querySelector(s)};function g(id){return document.getElementById(id)}
+function updateCounters(){let gC=0,bC=0,naC=0;ITEMS.forEach(it=>{const sel=q(`input[name="${it.id}"]:checked`);if(!sel)return;if(sel.value==='G')gC++;else if(sel.value==='B')bC++;else naC++});g('cnt_g').textContent='Good: '+gC;g('cnt_b').textContent='Bad: '+bC;g('cnt_na').textContent='N/A: '+naC}
+function getData(){const d={meta:{driver:g('driver').value,plate:g('plate').value,date:g('date').value,km_start:g('km_start').value,km_end:g('km_end').value,type:g('type').value,year:g('year').value,start_time:g('start_time').value,end_time:g('end_time').value},checklist:{},notes:g('notes').value,sign_driver:g('sign_driver').value,sign_inspector:g('sign_inspector').value};ITEMS.forEach(it=>{const sel=q(`input[name="${it.id}"]:checked`);d.checklist[it.id]=sel?sel.value:''});return d}
+function setData(d){if(!d)return;const m=d.meta||{};['driver','plate','date','km_start','km_end','type','year','start_time','end_time'].forEach(k=>g(k).value=m[k]||'');Object.entries(d.checklist||{}).forEach(([k,v])=>{const el=q(`input[name="${k}"][value="${v}"]`);if(el)el.checked=true});g('notes').value=d.notes||'';g('sign_driver').value=d.sign_driver||'';g('sign_inspector').value=d.sign_inspector||'';updateCounters()}
+function saveLocal(){localStorage.setItem('inspeksi_kendaraan',JSON.stringify(getData()));alert('Data tersimpan di perangkat ini')}
+function loadLocal(){const raw=localStorage.getItem('inspeksi_kendaraan');if(!raw){alert('Belum ada data tersimpan');return}setData(JSON.parse(raw));alert('Data dimuat')}
+function resetForm(){if(!confirm('Kosongkan semua isian?'))return;document.querySelectorAll('input,textarea,select').forEach(el=>{if(el.type==='radio')el.checked=false;else el.value=''});updateCounters()}
+function exportJSON(){const blob=new Blob([JSON.stringify(getData(),null,2)],{type:'application/json'});download(blob,fn('json'))}
+function exportCSV(){const d=getData();const rows=[['driver',d.meta.driver],['plate',d.meta.plate],['date',d.meta.date],['km_start',d.meta.km_start],['km_end',d.meta.km_end],['type',d.meta.type],['year',d.meta.year],['start_time',d.meta.start_time],['end_time',d.meta.end_time]];ITEMS.forEach(i=>rows.push([i.id,d.checklist[i.id]||'']));rows.push(['notes',JSON.stringify(d.notes||'')],['sign_driver',d.sign_driver||''],['sign_inspector',d.sign_inspector||'']);const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');download(new Blob([csv],{type:'text/csv'}),fn('csv'))}
+function printPDF(){window.print()}
+function fn(ext){const plate=g('plate').value||'nopol';const date=g('date').value||new Date().toISOString().slice(0,10);return `inspeksi_${plate}_${date}.${ext}`}
+function download(blob,filename){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
+document.addEventListener('DOMContentLoaded',()=>{g('driver').value='Junaedi';g('plate').value='B 7057 SPA'});
+</script>
+</body>
+</html>
